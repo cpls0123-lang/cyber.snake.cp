@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cyberpunk Mutant Snake - 霓虹珠串修復版</title>
+    <style>
+        body {
+            margin: 0; padding: 0; background-color: #05050a;
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; overflow: hidden;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            color: #00ffff;
+        }
+        canvas {
+            border: 3px solid #ff0096;
+            box-shadow: 0 0 30px #ff0096, inset 0 0 15px #00ffff;
+            background-color: #0a0a14;
+        }
+        #ui-overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; justify-content: center; align-items: center;
+            pointer-events: none;
+        }
+        .panel {
+            background: rgba(10, 10, 20, 0.95);
+            border: 2px solid #00ffff;
+            padding: 30px; text-align: center;
+            pointer-events: auto;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+            min-width: 400px;
+        }
+        h1 { color: #ff0096; text-shadow: 0 0 10px #ff0096; margin-top: 0; }
+        .btn {
+            background: transparent; border: 1px solid #ff0096;
+            color: #ff0096; padding: 10px 20px; margin: 10px;
+            cursor: pointer; font-size: 18px; transition: 0.3s;
+        }
+        .btn:hover, .btn.active {
+            background: #ff0096; color: white;
+            box-shadow: 0 0 15px #ff0096;
+        }
+        .instruction-grid {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 15px; text-align: left; margin: 20px 0; font-size: 14px;
+        }
+        .item-desc { display: flex; align-items: center; gap: 10px; }
+        .color-box { width: 15px; height: 15px; border-radius: 3px; }
+        .score-list { list-style: none; padding: 0; margin: 15px 0; }
+        .score-item { 
+            padding: 8px; border-bottom: 1px solid #333; 
+            display: flex; justify-content: space-between; 
+            font-family: 'Courier New', monospace; 
+        }
+        .rank-num { color: #ff0096; font-weight: bold; margin-right: 10px; }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+
+    <canvas id="gameCanvas" width="1280" height="720"></canvas>
+
+    <div id="ui-overlay">
+        <div id="startPanel" class="panel">
+            <h1>CYBER SNAKE: MUTANT</h1>
+            <p>按下 [任意按鍵] 開始進化</p>
+            <div class="instruction-grid">
+                <div>
+                    <strong>控制方式</strong><br>
+                    - [W/A/S/D] 或 [方向鍵] 移動<br>
+                    - [1] / [2] 使用道具槽<br>
+                    - [ESC] 開啟暫停選單
+                </div>
+                <div>
+                    <strong>遊戲規則</strong><br>
+                    - 初始長度僅 1 節 (蛇頭)<br>
+                    - 撞牆或撞到自己會死亡<br>
+                    - 吃掉敵人：增加 1 節身體<br>
+                    - 子彈擊殺：不增加長度
+                </div>
+            </div>
+            <div class="instruction-grid">
+                <div class="item-desc"><div class="color-box" style="background:#ff0000"></div> [紅] 時間暫停</div>
+                <div class="item-desc"><div class="color-box" style="background:#ffff00"></div> [黃] 擴散彈</div>
+                <div class="item-desc"><div class="color-box" style="background:#00ff00"></div> [綠] 衝刺加速</div>
+                <div class="item-desc"><div class="color-box" style="background:#0000ff"></div> [藍] 全體清理</div>
+            </div>
+        </div>
+
+        <div id="pausePanel" class="panel hidden">
+            <h1>系統暫停</h1>
+            <div id="pauseMenu">
+                <button class="btn active" id="btnResume">繼續遊戲</button><br>
+                <button class="btn" id="btnShowInfo">遊戲說明</button><br>
+                <button class="btn" id="btnScoreboard">計分板紀錄</button><br>
+                <button class="btn" id="btnQuit">離開遊戲</button>
+            </div>
+            <div id="infoSubPanel" class="hidden">
+                <h3>道具說明</h3>
+                <div class="instruction-grid" style="font-size: 12px;">
+                    <div class="item-desc"><div class="color-box" style="background:#ff0000"></div> 紅: 時停 3s</div>
+                    <div class="item-desc"><div class="color-box" style="background:#ffff00"></div> 黃: 散射擊殺</div>
+                    <div class="item-desc"><div class="color-box" style="background:#00ff00"></div> 綠: 衝刺 2s</div>
+                    <div class="item-desc"><div class="color-box" style="background:#0000ff"></div> 藍: 全場消滅</div>
+                </div>
+                <button class="btn" id="btnBackMenu">返回選單</button>
+            </div>
+            <div id="scoreSubPanel" class="hidden">
+                <h3>最高分數 (前五名)</h3>
+                <ul id="scoreList" class="score-list"></ul>
+                <button class="btn" id="btnBackMenu2">返回選單</button>
+            </div>
+        </div>
+
+        <div id="gameOverPanel" class="panel hidden">
+            <h1 style="color: #ff0000;">連線中斷 (GAME OVER)</h1>
+            <p>本次得分: <span id="finalScore">0</span></p>
+            <button class="btn" id="btnRestart">重新啟動</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // --- 常數 ---
+        const WIDTH = 1280, HEIGHT = 720;
+        const NEON_PINK = "#ff0096", NEON_BLUE = "#00ffff", NEON_PURPLE = "#b400ff", DARK_BG = "#05050a";
+        const SEG_SPACING = 20; 
+
+        // --- 狀態變數 (核心：這部分在 reload 之前不會消失) ---
+        let highScores = []; 
+        let gameState = "START_INFO"; 
+        let score = 0;
+        let snake = [], snakeDir = { x: 1, y: 0 }, nextDir = { x: 1, y: 0 };
+        let targetLength = 1, inventory = [null, null];
+        let enemies = [], itemsOnField = [], bullets = [], particles = [];
+        let timeStopTimer = 0, dashTimer = 0, enemySpawnTimer = 0;
+
+        // UI 引用
+        const startPanel = document.getElementById('startPanel'), pausePanel = document.getElementById('pausePanel');
+        const gameOverPanel = document.getElementById('gameOverPanel'), scoreList = document.getElementById('scoreList');
+
+        // --- 輔助功能 ---
+        function dist(x1, y1, x2, y2) { return Math.sqrt((x2 - x1)**2 + (y2 - y1)**2); }
+        function checkCircleCollision(x1, y1, r1, x2, y2, r2) { return dist(x1, y1, x2, y2) < (r1 + r2); }
+
+        function spawnParticle(x, y, color) {
+            for (let i = 0; i < 15; i++) {
+                particles.push({
+                    x, y, vx: (Math.random() - 0.5) * 300, vy: (Math.random() - 0.5) * 300,
+                    life: 1.0, color: color, r: Math.random() * 3 + 1
+                });
+            }
+        }
+
+        function spawnEnemy() {
+            if (enemies.length >= 15) return;
+            enemies.push({ 
+                x: 50 + Math.random() * (WIDTH - 100), y: 50 + Math.random() * (HEIGHT - 100), 
+                vx: (Math.random()-0.5)*150, vy: (Math.random()-0.5)*150, r: 15, alive: true 
+            });
+        }
+
+        function spawnItem() {
+            if (itemsOnField.length >= 3) return;
+            const types = [
+                { type: "TIME", color: "#ff0000" }, { type: "SPREAD", color: "#ffff00" },
+                { type: "DASH", color: "#00ff00" }, { type: "NUKE", color: "#0000ff" }
+            ];
+            const t = types[Math.floor(Math.random() * types.length)];
+            itemsOnField.push({ 
+                x: 100 + Math.random() * (WIDTH - 200), y: 100 + Math.random() * (HEIGHT - 200), 
+                ...t, r: 15, active: true 
+            });
+        }
+
+        function resetGame() {
+            snake = [{ x: WIDTH / 2, y: HEIGHT / 2 }];
+            snakeDir = { x: 1, y: 0 }; nextDir = { x: 1, y: 0 };
+            targetLength = 1; score = 0;
+            enemies = []; itemsOnField = []; bullets = []; particles = [];
+            inventory = [null, null];
+            timeStopTimer = dashTimer = enemySpawnTimer = 0;
+            gameOverPanel.classList.add('hidden');
+            gameState = "RUNNING";
+            for (let i = 0; i < 6; i++) spawnEnemy();
+        }
+
+        function endGame() {
+            if (gameState === "GAME_OVER") return;
+            gameState = "GAME_OVER";
+            document.getElementById('finalScore').innerText = score;
+            
+            // 重要：存入計分板
+            highScores.push(score);
+            highScores.sort((a, b) => b - a);
+            highScores = highScores.slice(0, 5);
+            
+            gameOverPanel.classList.remove('hidden');
+        }
+
+        function useItem(slot) {
+            if (gameState !== "RUNNING" || !inventory[slot]) return;
+            const type = inventory[slot].type;
+            inventory[slot] = null;
+            if (type === "TIME") timeStopTimer = 3;
+            else if (type === "SPREAD") {
+                for (let i = 0; i < 12; i++) {
+                    const ang = (i / 12) * Math.PI * 2;
+                    bullets.push({ x: snake[0].x, y: snake[0].y, vx: Math.cos(ang) * 600, vy: Math.sin(ang) * 600, life: 1.0, active: true });
+                }
+            } else if (type === "DASH") dashTimer = 2;
+            else if (type === "NUKE") {
+                enemies.forEach(e => { if(e.alive){ e.alive = false; score += 5; spawnParticle(e.x, e.y, NEON_BLUE); }});
+            }
+        }
+
+        // --- 輸入監聽 ---
+        window.addEventListener('keydown', (e) => {
+            if (gameState === "START_INFO") {
+                startPanel.classList.add('hidden'); resetGame(); return;
+            }
+            if (e.key === "Escape") {
+                if (gameState === "RUNNING") {
+                    gameState = "PAUSED"; pausePanel.classList.remove('hidden'); showSubPanel('menu');
+                } else if (gameState === "PAUSED") {
+                    gameState = "RUNNING"; pausePanel.classList.add('hidden');
+                }
+                return;
+            }
+            if (gameState === "RUNNING") {
+                const key = e.key.toLowerCase();
+                if ((key === "w" || e.key === "ArrowUp") && snakeDir.y === 0) nextDir = { x: 0, y: -1 };
+                else if ((key === "s" || e.key === "ArrowDown") && snakeDir.y === 0) nextDir = { x: 0, y: 1 };
+                else if ((key === "a" || e.key === "ArrowLeft") && snakeDir.x === 0) nextDir = { x: -1, y: 0 };
+                else if ((key === "d" || e.key === "ArrowRight") && snakeDir.x === 0) nextDir = { x: 1, y: 0 };
+                if (e.key === "1") useItem(0);
+                if (e.key === "2") useItem(1);
+            }
+        });
+
+        // --- UI 控制 ---
+        function showSubPanel(type) {
+            document.getElementById('pauseMenu').classList.add('hidden');
+            document.getElementById('infoSubPanel').classList.add('hidden');
+            document.getElementById('scoreSubPanel').classList.add('hidden');
+            if (type === 'menu') document.getElementById('pauseMenu').classList.remove('hidden');
+            else if (type === 'info') document.getElementById('infoSubPanel').classList.remove('hidden');
+            else if (type === 'score') {
+                document.getElementById('scoreSubPanel').classList.remove('hidden');
+                scoreList.innerHTML = highScores.map((s, i) => `
+                    <li class="score-item"><span><span class="rank-num">${i+1}.</span> ${s}</span><span>PTS</span></li>
+                `).join('') || '<li class="score-item">尚無紀錄</li>';
+            }
+        }
+
+        document.getElementById('btnResume').onclick = () => { gameState = "RUNNING"; pausePanel.classList.add('hidden'); };
+        document.getElementById('btnShowInfo').onclick = () => showSubPanel('info');
+        document.getElementById('btnScoreboard').onclick = () => showSubPanel('score');
+        document.getElementById('btnQuit').onclick = () => location.reload();
+        document.getElementById('btnBackMenu').onclick = () => showSubPanel('menu');
+        document.getElementById('btnBackMenu2').onclick = () => showSubPanel('menu');
+        document.getElementById('btnRestart').onclick = () => resetGame();
+
+        // --- 核心邏輯 ---
+        function update(dt) {
+            if (gameState !== "RUNNING") return;
+
+            snakeDir = nextDir;
+            const speed = (dashTimer > 0) ? 500 : 200;
+            if (dashTimer > 0) dashTimer -= dt;
+            if (timeStopTimer > 0) timeStopTimer -= dt;
+
+            const head = snake[0];
+            const nextX = head.x + snakeDir.x * speed * dt;
+            const nextY = head.y + snakeDir.y * speed * dt;
+
+            // 撞牆
+            if (nextX < 15 || nextX > WIDTH - 15 || nextY < 15 || nextY > HEIGHT - 15) { endGame(); return; }
+
+            // 撞身體
+            for (let i = 20; i < snake.length; i++) {
+                if (dist(nextX, nextY, snake[i].x, snake[i].y) < 10) { endGame(); return; }
+            }
+
+            snake.unshift({ x: nextX, y: nextY });
+            // 根據長度裁切陣列 (珠串效果：每一節點間隔約 4 幀)
+            const maxNodes = targetLength * 10; 
+            if (snake.length > maxNodes) snake.pop();
+
+            // 敵人
+            enemySpawnTimer += dt;
+            if (enemySpawnTimer > 3) { spawnEnemy(); enemySpawnTimer = 0; }
+            enemies.forEach(e => {
+                if (timeStopTimer <= 0) {
+                    e.x += e.vx * dt; e.y += e.vy * dt;
+                    if (e.x < 20 || e.x > WIDTH - 20) e.vx *= -1;
+                    if (e.y < 20 || e.y > HEIGHT - 20) e.vy *= -1;
+                }
+                if (checkCircleCollision(nextX, nextY, 18, e.x, e.y, e.r)) {
+                    e.alive = false; score += 10; targetLength++; spawnParticle(e.x, e.y, NEON_PINK);
+                }
+            });
+            enemies = enemies.filter(e => e.alive);
+
+            // 道具修復邏輯
+            if (Math.random() < 0.005) spawnItem();
+            itemsOnField.forEach(it => {
+                if (it.active && checkCircleCollision(nextX, nextY, 20, it.x, it.y, it.r)) {
+                    let collected = false;
+                    for (let i = 0; i < 2; i++) {
+                        if (!inventory[i]) {
+                            inventory[i] = { type: it.type, color: it.color };
+                            collected = true; break;
+                        }
+                    }
+                    // 關鍵修復：不論有沒有撿成功，碰到就讓場上道具消失
+                    it.active = false; 
+                }
+            });
+            itemsOnField = itemsOnField.filter(it => it.active);
+
+            // 子彈與粒子
+            bullets.forEach(b => {
+                b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+                enemies.forEach(e => {
+                    if (e.alive && checkCircleCollision(b.x, b.y, 8, e.x, e.y, e.r)) {
+                        e.alive = false; b.active = false; score += 5; spawnParticle(e.x, e.y, NEON_PURPLE);
+                    }
+                });
+            });
+            bullets = bullets.filter(b => b.active && b.life > 0);
+            particles.forEach(p => { p.x += p.vx * dt; p.y += p.vy * dt; p.life -= dt; });
+            particles = particles.filter(p => p.life > 0);
+        }
+
+        function draw() {
+            ctx.fillStyle = DARK_BG; ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+            // 網格與邊界
+            ctx.strokeStyle = "#111122"; ctx.lineWidth = 1;
+            for(let i=0; i<WIDTH; i+=40) { ctx.beginPath(); ctx.moveTo(i,0); ctx.lineTo(i,HEIGHT); ctx.stroke(); }
+            for(let i=0; i<HEIGHT; i+=40) { ctx.beginPath(); ctx.moveTo(0,i); ctx.lineTo(WIDTH,i); ctx.stroke(); }
+            ctx.strokeStyle = NEON_PINK; ctx.lineWidth = 4; ctx.strokeRect(10, 10, WIDTH-20, HEIGHT-20);
+
+            if (gameState !== "START_INFO") {
+                // 繪製蛇 (霓虹圓珠)
+                for (let i = 0; i < targetLength; i++) {
+                    const idx = i * 10;
+                    if (idx >= snake.length) break;
+                    const seg = snake[idx];
+                    ctx.beginPath();
+                    ctx.arc(seg.x, seg.y, i===0 ? 18 : 12, 0, Math.PI*2);
+                    ctx.fillStyle = i===0 ? NEON_BLUE : NEON_PURPLE;
+                    ctx.shadowBlur = 15; ctx.shadowColor = ctx.fillStyle;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                }
+
+                // 敵人與道具
+                enemies.forEach(e => {
+                    ctx.fillStyle = NEON_PINK; ctx.shadowBlur = 10; ctx.shadowColor = NEON_PINK;
+                    ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, Math.PI*2); ctx.fill(); ctx.shadowBlur = 0;
+                });
+                itemsOnField.forEach(it => {
+                    ctx.fillStyle = it.color; ctx.shadowBlur = 15; ctx.shadowColor = it.color;
+                    ctx.save(); ctx.translate(it.x, it.y); ctx.rotate(Date.now()*0.005);
+                    ctx.fillRect(-12, -12, 24, 24); ctx.restore(); ctx.shadowBlur = 0;
+                });
+
+                // 子彈與粒子
+                ctx.fillStyle = "white"; bullets.forEach(b => { ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2); ctx.fill(); });
+                particles.forEach(p => { ctx.globalAlpha = p.life; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill(); });
+                ctx.globalAlpha = 1.0;
+
+                // HUD
+                ctx.fillStyle = NEON_BLUE; ctx.font = "bold 24px 'Courier New'";
+                ctx.fillText(`SCORE: ${score.toString().padStart(5, '0')}`, 40, 50);
+                inventory.forEach((item, i) => {
+                    const x = 40 + i * 140, y = HEIGHT - 60;
+                    ctx.strokeStyle = item ? item.color : "#333";
+                    ctx.strokeRect(x, y, 120, 40);
+                    if (item) { ctx.fillStyle = item.color; ctx.font = "bold 12px Arial"; ctx.fillText(item.type, x+10, y+25); }
+                });
+            }
+        }
+
+        let lastTime = performance.now();
+        function loop(now) {
+            update((now - lastTime) / 1000); lastTime = now; draw(); requestAnimationFrame(loop);
+        }
+        requestAnimationFrame(loop);
+    </script>
+</body>
+</html>
