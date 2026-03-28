@@ -1,8 +1,9 @@
 #  https://cpls0123-lang.github.io/cyber.snake.cp/
 
 Gameplay screen
-
-https://github.com/user-attachments/assets/0cc02659-91c1-4288-92cc-2eddf0b19f7d
+<p align="center">
+  <iframe width="1920" height="1080" src="https://youtu.be/d97CZufd-TQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+</p>
 
 
 
