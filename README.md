@@ -2,7 +2,9 @@
 
 Gameplay screen
 <p align="center">
-  <iframe width="1920" height="1080" src="https://www.youtube.com/embed/d97CZufd-TQ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+  <a href="https://www.youtube.com/watch?v=d97CZufd-TQ">
+    <img src="https://img.youtube.com/vi/d97CZufd-TQ/0.jpg" alt="Gameplay Video" width="600">
+  </a>
 </p>
 
 
