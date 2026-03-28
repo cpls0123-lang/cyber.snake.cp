@@ -1,11 +1,7 @@
 #  https://cpls0123-lang.github.io/cyber.snake.cp/
 
-Gameplay screen
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=d97CZufd-TQ">
-    <img src="https://img.youtube.com/vi/d97CZufd-TQ/0.jpg" alt="Gameplay Video" width="600">
-  </a>
-</p>
+Gameplay screen:
+https://github.com/user-attachments/assets/486355de-9bbc-4db9-8927-12536be12033
 
 
 
